@@ -9,11 +9,6 @@ pipeline {
 
     stages {
 
-        stage('Checkout Code') {
-            steps {
-                git 'https://github.com/alokatulkar/example-voting-myapp'
-            }
-        }
 
         stage('Build Docker Images') {
             steps {
