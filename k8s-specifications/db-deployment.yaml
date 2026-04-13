@@ -1,9 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: db
+  namespace: voting-app
   labels:
     app: db
-  name: db
 spec:
   replicas: 1
   selector:
@@ -15,19 +16,48 @@ spec:
         app: db
     spec:
       containers:
-      - image: postgres:15-alpine
-        name: postgres
+      - name: postgres
+        image: postgres:15-alpine
+
+        ports:
+        - containerPort: 5432
+
         env:
         - name: POSTGRES_USER
           value: postgres
         - name: POSTGRES_PASSWORD
           value: postgres
-        ports:
-        - containerPort: 5432
-          name: postgres
+        - name: POSTGRES_DB
+          value: postgres
+
+        # ✅ Resource limits (VERY IMPORTANT)
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+        # ✅ Liveness probe
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        # ✅ Readiness probe
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
         volumeMounts:
-        - mountPath: /var/lib/postgresql/data
-          name: db-data
+        - name: db-data
+          mountPath: /var/lib/postgresql/data
+
+      # ✅ Better than emptyDir (still not production, but safer)
       volumes:
       - name: db-data
-        emptyDir: {} 
+        emptyDir: {}

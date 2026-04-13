@@ -1,9 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: worker
+  namespace: voting-app
   labels:
     app: worker
-  name: worker
 spec:
   replicas: 1
   selector:
@@ -14,6 +15,36 @@ spec:
       labels:
         app: worker
     spec:
+
+      # ✅ Wait for Redis & DB (CRITICAL)
+      initContainers:
+      - name: wait-for-redis
+        image: busybox
+        command: ['sh', '-c', 'until nc -z redis 6379; do echo waiting for redis; sleep 5; done;']
+
+      - name: wait-for-db
+        image: busybox
+        command: ['sh', '-c', 'until nc -z db 5432; do echo waiting for db; sleep 5; done;']
+
       containers:
-      - image: dockersamples/examplevotingapp_worker
-        name: worker
+      - name: worker
+        image: dockersamples/examplevotingapp_worker
+
+        # ✅ Resource limits
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "300m"
+            memory: "256Mi"
+
+        # ✅ Liveness probe (process check)
+        livenessProbe:
+          exec:
+            command: ["pgrep", "worker"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        # ✅ Restart policy (default but explicit)
+      restartPolicy: Always

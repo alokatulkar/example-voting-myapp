@@ -1,11 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: vote
+  namespace: voting-app
   labels:
     app: vote
-  name: vote
 spec:
-  replicas: 1
+  replicas: 2   # ✅ better availability
   selector:
     matchLabels:
       app: vote
@@ -14,9 +15,41 @@ spec:
       labels:
         app: vote
     spec:
+
+      # ✅ Wait for Redis (CRITICAL)
+      initContainers:
+      - name: wait-for-redis
+        image: busybox
+        command: ['sh', '-c', 'until nc -z redis 6379; do echo waiting for redis; sleep 5; done;']
+
       containers:
-      - image: dockersamples/examplevotingapp_vote
-        name: vote
+      - name: vote
+        image: dockersamples/examplevotingapp_vote
+
         ports:
         - containerPort: 80
-          name: vote
+
+        # ✅ Resource limits
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+        # ✅ Liveness probe
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        # ✅ Readiness probe
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5

@@ -1,11 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: result
+  namespace: voting-app
   labels:
     app: result
-  name: result
 spec:
-  replicas: 1
+  replicas: 2   # ✅ better availability
   selector:
     matchLabels:
       app: result
@@ -14,9 +15,41 @@ spec:
       labels:
         app: result
     spec:
+
+      # ✅ Wait for dependencies (CRITICAL)
+      initContainers:
+      - name: wait-for-db
+        image: busybox
+        command: ['sh', '-c', 'until nc -z db 5432; do echo waiting for db; sleep 5; done;']
+
       containers:
-      - image: dockersamples/examplevotingapp_result
-        name: result
+      - name: result
+        image: dockersamples/examplevotingapp_result
+
         ports:
         - containerPort: 80
-          name: result
+
+        # ✅ Resource limits
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+        # ✅ Liveness probe
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        # ✅ Readiness probe
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5

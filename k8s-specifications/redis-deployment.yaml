@@ -1,9 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: redis
+  namespace: voting-app
   labels:
     app: redis
-  name: redis
 spec:
   replicas: 1
   selector:
@@ -15,14 +16,39 @@ spec:
         app: redis
     spec:
       containers:
-      - image: redis:alpine
-        name: redis
+      - name: redis
+        image: redis:7-alpine
+
         ports:
         - containerPort: 6379
-          name: redis
+
+        # ✅ Resource limits (VERY IMPORTANT)
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "300m"
+            memory: "256Mi"
+
+        # ✅ Liveness probe
+        livenessProbe:
+          exec:
+            command: ["redis-cli", "ping"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        # ✅ Readiness probe
+        readinessProbe:
+          exec:
+            command: ["redis-cli", "ping"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
         volumeMounts:
-        - mountPath: /data
-          name: redis-data
+        - name: redis-data
+          mountPath: /data
+
       volumes:
       - name: redis-data
-        emptyDir: {} 
+        emptyDir: {}
