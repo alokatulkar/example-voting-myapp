@@ -71,6 +71,13 @@ pipeline {
                     --region $AWS_REGION \
                     --name $CLUSTER_NAME
 
+                    # ✅ Step 1: Create namespace FIRST
+                    kubectl apply -f k8s-specifications/namespace.yaml
+
+                    # ✅ Step 2: Wait for namespace to be ready
+                    sleep 10
+
+                    # ✅ Step 3: Deploy remaining resources
                     kubectl apply -f k8s-specifications/
                     '''
                 }
