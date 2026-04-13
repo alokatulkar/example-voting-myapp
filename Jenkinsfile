@@ -9,16 +9,13 @@ pipeline {
 
     stages {
 
-
         stage('Build Docker Images') {
             steps {
-                script {
-                    sh '''
-                    docker build -t vote ./vote
-                    docker build -t result ./result
-                    docker build -t worker ./worker
-                    '''
-                }
+                sh '''
+                docker build -t vote ./vote
+                docker build -t result ./result
+                docker build -t worker ./worker
+                '''
             }
         }
 
@@ -34,47 +31,63 @@ pipeline {
 
         stage('Login to AWS ECR') {
             steps {
-                sh '''
-                aws ecr get-login-password --region $AWS_REGION | \
-                docker login --username AWS --password-stdin $ECR_REPO
-                '''
+                withCredentials([[
+                  $class: 'AmazonWebServicesCredentialsBinding',
+                  credentialsId: 'aws-creds'
+                ]]) {
+                    sh '''
+                    aws ecr get-login-password --region $AWS_REGION | \
+                    docker login --username AWS --password-stdin $ECR_REPO
+                    '''
+                }
             }
         }
 
         stage('Push Images to ECR') {
             steps {
-                sh '''
-                docker push $ECR_REPO/vote:latest
-                docker push $ECR_REPO/result:latest
-                docker push $ECR_REPO/worker:latest
-                '''
-            }
-        }
-
-        stage('Update kubeconfig') {
-            steps {
-                sh '''
-                aws eks update-kubeconfig \
-                --region $AWS_REGION \
-                --name $CLUSTER_NAME
-                '''
+                withCredentials([[
+                  $class: 'AmazonWebServicesCredentialsBinding',
+                  credentialsId: 'aws-creds'
+                ]]) {
+                    sh '''
+                    docker push $ECR_REPO/vote:latest
+                    docker push $ECR_REPO/result:latest
+                    docker push $ECR_REPO/worker:latest
+                    '''
+                }
             }
         }
 
         stage('Deploy to EKS') {
             steps {
-                sh '''
-                kubectl apply -f k8s-specifications/
-                '''
+                withCredentials([[
+                  $class: 'AmazonWebServicesCredentialsBinding',
+                  credentialsId: 'aws-creds'
+                ]]) {
+                    sh '''
+                    aws sts get-caller-identity
+
+                    aws eks update-kubeconfig \
+                    --region $AWS_REGION \
+                    --name $CLUSTER_NAME
+
+                    kubectl apply -f k8s-specifications/
+                    '''
+                }
             }
         }
 
         stage('Verify Deployment') {
             steps {
-                sh '''
-                kubectl get pods
-                kubectl get svc
-                '''
+                withCredentials([[
+                  $class: 'AmazonWebServicesCredentialsBinding',
+                  credentialsId: 'aws-creds'
+                ]]) {
+                    sh '''
+                    kubectl get pods -n voting-app
+                    kubectl get svc -n voting-app
+                    '''
+                }
             }
         }
     }
