@@ -1,0 +1,78 @@
+name: Voting App CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ap-south-1
+  EKS_CLUSTER: voting-app-cluster
+
+jobs:
+
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+        aws-region: ap-south-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build Vote Image
+      run: |
+        docker build -t vote ./vote
+        docker tag vote:latest ${{ steps.login-ecr.outputs.registry }}/vote:${{ github.sha }}
+
+    - name: Build Result Image
+      run: |
+        docker build -t result ./result
+        docker tag result:latest ${{ steps.login-ecr.outputs.registry }}/result:${{ github.sha }}
+
+    - name: Build Worker Image
+      run: |
+        docker build -t worker ./worker
+        docker tag worker:latest ${{ steps.login-ecr.outputs.registry }}/worker:${{ github.sha }}
+
+    - name: Push Images
+      run: |
+        docker push ${{ steps.login-ecr.outputs.registry }}/vote:${{ github.sha }}
+        docker push ${{ steps.login-ecr.outputs.registry }}/result:${{ github.sha }}
+        docker push ${{ steps.login-ecr.outputs.registry }}/worker:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+        aws-region: ap-south-1
+
+    - name: Configure kubectl
+      run: |
+        aws eks update-kubeconfig \
+        --region ap-south-1 \
+        --name voting-app-cluster
+
+    - name: Deploy to EKS
+      run: |
+        kubectl apply -f k8s-specifications/
