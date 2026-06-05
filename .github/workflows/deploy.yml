@@ -73,6 +73,14 @@ jobs:
         --region ap-south-1 \
         --name ekscluster
 
-    - name: Deploy to EKS
+    - name: Create Namespace
+      run: |
+        kubectl apply -f k8s-specifications/namespace.yaml
+
+    - name: Wait for Namespace
+      run: |
+        sleep 10
+
+    - name: Deploy Application
       run: |
         kubectl apply -f k8s-specifications/
