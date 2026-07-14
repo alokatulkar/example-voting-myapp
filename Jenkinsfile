@@ -22,7 +22,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                url: '<your-github-repo-url>'
+                url: 'https://github.com/alokatulkar/example-voting-myapp'
             }
         }
 
